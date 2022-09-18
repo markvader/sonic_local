@@ -5,8 +5,11 @@ import asyncio as aio
 import json
 
 from base64 import b64encode
-from logging import getLogger
 from typing import Literal
+import logging
+logger = logging.getLogger('websockets')
+logger.setLevel(logging.DEBUG)
+logger.addHandler(logging.StreamHandler())
 
 
 class SonicWebsocketListener(object):
@@ -20,8 +23,8 @@ class SonicWebsocketListener(object):
         self.host = host
         self.username = username
         self.password = password
-        self.logger = getLogger(name=f'Sonic-{self.host}')
-        self.logger.info("Incoming messages will be echoed to stdout")
+        # self.logger = getLogger(name=f'Sonic-{self.host}')
+        # self.logger.info("Incoming messages will be echoed to stdout")
         self.extra_headers: dict = self.get_auth_header()
         self.ssl_context: ssl.SSLContext = self.get_ssl_context()
 
@@ -60,20 +63,20 @@ class SonicWebsocketListener(object):
                 self.logger.error(f"Cannot parse message: {message}. Exception: {repr(e)}")
 
     async def consume(self, event: Literal["requestTelemetry", "requestState"]):
-        print("63")
+        print("Line 63 - In the consume function")
         websocket_resource_url = f"wss://{self.host}"
-        print(websocket_resource_url)
+        print("Line 65 - websocket_resource_url:", websocket_resource_url)
         try:
-            print("67")
-            print(self.extra_headers)
-            print("69")
-            print(event)
+            print("Line 67, Extra Headers are: ",self.extra_headers)
+            print("Line 68, Event topic is: ",event)
             async with websockets.connect(uri=websocket_resource_url,
                                           ssl=self.ssl_context,
                                           extra_headers=self.extra_headers) as connection:
-                transmit_msg = json.dumps({"event": event})
+                transmit_msg = json.dumps({"event": {event}})
                 print(transmit_msg)
                 await connection.send(transmit_msg)
+                while True:
+                    print("77")
                 if connection.open:
                     print("connection.open - line 75")
                     self.logger.info("Connection established.")
@@ -86,22 +89,21 @@ class SonicWebsocketListener(object):
             if "HTTP 401" in repr(e):
                 self.logger.error("Received HTTP 401 Unauthorized. Check your credentials.")
                 sys.exit(1)
-        except Exception:
-            print("89 - unknown exception")
+        except Exception as f:
+            print("Line 90 - Unknown exception thrown")
+            print({repr(f)})
             sys.exit(1)
 
     def run(self, event: Literal["requestTelemetry", "requestState"]):
         try:
-            print("Func run - try statement - line 94")
-            print(event)
+            print("Line 95 - run function - try statement launches consume loop")
             aio.get_event_loop().run_until_complete(self.consume(event=event))
-            print("Func run - try statement - line 96")
+            print("Line 97 - run function - try statement run loop forever")
             aio.get_event_loop().run_forever()
-            print("Func run - try statement - line 98")
         except KeyboardInterrupt:
             self.logger.info("Received KeyboardInterrupt, Closing Connection")
         finally:
-            print("101 - Stats:")
+            print("Line 102 - Run function - finally statement")
 
 
 def main():
