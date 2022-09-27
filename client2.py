@@ -161,7 +161,7 @@ class SonicLocal:
 
 
 def main():
-    soniclocal = SonicLocal("192.168.1.11:443", id, "peer_id", username="magic", password="82jVb26KlwQ=")
+    soniclocal = SonicLocal("192.168.1.11:443", id, "peer_id", username="username", password="password=")
     soniclocal.on_connect = lambda: soniclocal.setup_call()
     soniclocal.connect()
     soniclocal.start()
