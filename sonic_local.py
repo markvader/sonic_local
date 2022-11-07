@@ -12,7 +12,7 @@ logger.addHandler(logging.StreamHandler())
 # USER TO PROVIDE FOLLOWING VARIABLES
 username = "ENTERusernameFROMsignalSETTINGSinTHEsonicAPP"
 password = "ENTERpasswordFROMsignalSETTINGSinTHEsonicAPP"
-ip_address = "find your ip address on your local network"
+ip_address = "find your ip address on your local network" # e.g "192.168.1.12"
 
 
 port = 443
