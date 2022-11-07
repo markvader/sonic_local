@@ -35,9 +35,6 @@ async def sonic_connect():
     print(f"{headers}")
     print(f"{ssl_context}")
 
-    transmit_msg = json.dumps({"event": "requestTelemetry"})
-    print(f"{transmit_msg}")
-
     async with websockets.connect(uri, extra_headers=headers, ssl=ssl_context) as websocket:
         await websocket.send(json.dumps({"event": "requestTelemetry"}))
         response = await websocket.recv()
