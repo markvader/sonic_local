@@ -1,5 +1,4 @@
 import asyncio
-from asyncio.exceptions import TimeoutError as ConnectionTimeoutError
 import base64
 import websockets
 import json
@@ -17,10 +16,10 @@ ip_address = "Find your ip address on your local network"  # e.g "192.168.1.12"
 
 port = 443
 uri = f"wss://{ip_address}:{port}"
-TIMEOUT = 20
+delay = 1
 
 
-async def sonic_connect():
+async def ping():
     ssl_context = ssl.create_default_context()
     ssl_context.check_hostname = False
     ssl_context.verify_mode = ssl.CERT_NONE
@@ -28,6 +27,7 @@ async def sonic_connect():
 
     user_pass = f"{username}:{password}"
     headers = {'Authorization': f"Basic {base64.b64encode(user_pass.encode()).decode()}"}
+    # Note: Connection & Upgrade headers already included in websockets.connect(), therefore likely not needed
 
     # prints for debugging
     print(f"{uri}")
@@ -35,25 +35,23 @@ async def sonic_connect():
     print(f"{ssl_context}")
 
     try:
-        # Try connection attempt
-        connection = await asyncio.wait_for(websockets.connect(uri,
-                                                               extra_headers=headers,
-                                                               ssl=ssl_context), TIMEOUT)
-        # If success
         async with websockets.connect(uri, extra_headers=headers, ssl=ssl_context) as websocket:
-            await websocket.send(json.dumps({"event": "requestTelemetry"}))
-            response = await websocket.recv()
-            print(f"{response}")
-    except ConnectionTimeoutError as e:
-        print({repr(e)})
-        print("Connection Timeout Error")
-    except ConnectionResetError as f:
-        print({repr(f)})
-        print("Connection Reset Error")
-    except Exception as g:
-        print("unknown error")
-        print({repr(g)})
+            await websocket.send(json.dumps({"event": "ping"}))
+            pong = await websocket.recv()
+            print(f"Successfully connected to {uri}, response to ping: {pong}")
+
+            await asyncio.sleep(delay)
+            await websocket.send('ping')
+            pong = await websocket.recv()
+            print(f"Maintained connection to {uri}, response to ping: {pong}")
+            print("Success!")
+
+    except (RuntimeError, websockets.exceptions.ConnectionClosed) as e:
+        print(e.args)
+    except (websockets.exceptions.InvalidStatusCode, ConnectionResetError, websockets.exceptions.InvalidMessage) as e:
+        print('Connection to Signal device was unsuccessful:', e)
+        print(e.args)
 
 
 if __name__ == "__main__":
-    asyncio.run(sonic_connect())
+    asyncio.run(ping())
