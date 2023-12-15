@@ -1,0 +1,10 @@
+# Gitignore settings for Sonic Device - Local API Python Library
+
+# Ignored files
+config.ini
+is_daily_usage_reset.txt
+
+# Ignored folders
+.idea
+venv
+__pycache__
