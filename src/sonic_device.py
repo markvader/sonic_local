@@ -94,4 +94,6 @@ class SonicDevice:
                 latest_usage = flow_rate * time_diff
                 self.daily_volume += latest_usage  # ml/min to ml/day
                 self.last_update = datetime.now()
-                print(self.last_update, "- latest_usage:", latest_usage, "daily_volume:", round(self.daily_volume, 2))
+                print(self.last_update,
+                      "- latest_usage (ml):", round(latest_usage, 2),
+                      "daily_volume (ml):", round(self.daily_volume, 2))

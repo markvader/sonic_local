@@ -39,3 +39,7 @@ TODO
 3. Can I automatically identify the devices ip on my local network? or is this something that will be better suited to the Home Assistant integration?
 
 4. remove port number from config.ini and set default as 443 in code.
+5. Handle crashes and reconnection to websocket better, device can become unreachable if clean disconnect is not performed.
+6. Add logging
+7. Add tests
+8. 
