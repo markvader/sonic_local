@@ -23,7 +23,16 @@ It has the methods `to_json` and `from_json`.
 4. `main`: An instance of `SonicDevice` is created, we connect to it, receive a stream of volume usage, 
 Also able to perform operations like open and close the valve.
 
+TO USE
+
+To test. copy the config_demo.ini file and rename to config.ini and update the values with your device details.
+You need to enable the `Local mode status` in the `Signal Settings` within the `Settings` in the `Sonic` App to get the device's local server username/password.
+If the `Local mode status` is disabled and re-enabled, the username/password will change.
+Then run `python main.py`
+
 TODO
 
 add method for storing/caching daily volume in case program crashes
 need to handle the concurrency of receiving/returning volumes, and also state, and performing functions like opening, closing valve
+Can I automatically identify the devices ip on my local network? or is this something that will be better suited to the Home Assistant integration?
+remove port number from config.ini and set default as 443 in code.
