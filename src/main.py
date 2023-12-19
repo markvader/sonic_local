@@ -13,8 +13,12 @@ password = config['CREDENTIALS']['signal_password']
 async def main():
     device = SonicDevice(device_address, device_port, username, password)
     await device.connect()
-    await device.reset_daily_usage()
-    await device.calculate_daily_volume()
+
+    calculate_volume_task = asyncio.create_task(device.calculate_daily_volume())
+    daily_reset_task = asyncio.create_task(device.reset_daily_usage())
+
+    # Wait for both tasks to complete (which they won't, they will run forever)
+    await asyncio.gather(calculate_volume_task, daily_reset_task)
 
     # await device.subscribe('requestState')
     # await device.subscribe('requestTelemetry')
