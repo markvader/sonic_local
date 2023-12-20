@@ -95,8 +95,10 @@ class SonicDevice:
             message = json.loads(response)
 
             if message['event'] == 'telemetry':
-                time_diff = await self.time_since_last_update()
-                self.last_update = datetime.now()
+                probed_at = message['data']['probed_at']  # 1703073823925
+                telemetry_datetime = datetime.fromtimestamp(probed_at / 1000.0)  # 2023-12-20 17:16:24.430000
+                time_diff = await self.time_since_last_update(telemetry_datetime)
+                self.last_update = telemetry_datetime
                 flow_rate = message['data']['water_flow']  # 3088.8671875
                 leak_status = message['data']['leak_status']  # No Leaks
                 status = message['data']['status']  # ['OKAY']
@@ -104,11 +106,10 @@ class SonicDevice:
                 ambient_temp = message['data']['ambient_temp']  # 11.9375
                 abs_pressure = message['data']['abs_pressure']  # 4831
                 battery_level = message['data']['battery_level']  # okay
-                probed_at = message['data']['probed_at']  # 1703073823925
                 if time_diff < 1440:  # If the last update was less than 24 hours ago
                     await self.calculate_volume(flow_rate, time_diff)
                 await asyncio.sleep(0.5)
-                print(self.last_update,
+                print("data_timestamp:", telemetry_datetime,
                       "- flow_rate:", flow_rate,
                       "- water_temp:", water_temp,
                       "- abs_pressure:", abs_pressure,
@@ -119,10 +120,10 @@ class SonicDevice:
         self.daily_volume += latest_usage  # ml/min to ml/day
         return
 
-    async def time_since_last_update(self):
+    async def time_since_last_update(self, telemetry_datetime):
         try:
-            time_diff = (datetime.now() - self.last_update).total_seconds() / 60  # Calculate time in minutes
+            time_diff = (telemetry_datetime - self.last_update).total_seconds() / 60  # Calculate time in minutes
         except TypeError:
             self.last_update = datetime.strptime(self.last_update, '%Y-%m-%d %H:%M:%S.%f')
-            time_diff = (datetime.now() - self.last_update).total_seconds() / 60  # in minutes
+            time_diff = (telemetry_datetime - self.last_update).total_seconds() / 60  # in minutes
         return time_diff
