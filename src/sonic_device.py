@@ -10,7 +10,7 @@ from json import JSONDecodeError
 class SonicDevice:
     def __init__(self, host, port, username, password):
         self.last_reset_datetime = None
-        self.last_update = '2023-12-14 00:00:00.00001'
+        self.last_update = '2023-12-14 00:00:00.000001'
         self.daily_volume = 0
         self.client = WebSocketClient(host, port, username, password)
 
@@ -90,26 +90,36 @@ class SonicDevice:
             print("last_reset_datetime:", self.last_reset_datetime)
             await asyncio.sleep(5)  # ensure that the reset is not performed twice
 
-    async def calculate_daily_volume(self):
+    async def telemetry_data(self):
         while True:
             response = await self.client.receive()
             message = json.loads(response)
 
             if message['event'] == 'telemetry':
-                flow_rate = message['data']['water_flow']
-                # print("70 flow_rate", flow_rate)
-                try:
-                    time_diff = (datetime.now() - self.last_update).total_seconds() / 60  # Calculate time in minutes
-                except TypeError:
-                    # If self.last_update is not in datetime format, convert it and try again
-                    self.last_update = datetime.strptime(self.last_update, '%Y-%m-%d %H:%M:%S.%f')
-                    time_diff = (datetime.now() - self.last_update).total_seconds() / 60  # in minutes
-                # print("70 time_diff", time_diff)
+                time_diff = await self.time_since_last_update()
                 self.last_update = datetime.now()
+                flow_rate = message['data']['water_flow']  # 3088.8671875
+                leak_status = message['data']['leak_status']  # No Leaks
+                status = message['data']['status']  # ['OKAY']
+                water_temp = message['data']['water_temp']  # 10.4375
+                ambient_temp = message['data']['ambient_temp']  # 11.9375
+                abs_pressure = message['data']['abs_pressure']  # 4831
+                battery_level = message['data']['battery_level']  # okay
+                probed_at = message['data']['probed_at']  # 1703073823925
                 if time_diff < 1440:  # If the last update was less than 24 hours ago
-                    latest_usage = flow_rate * time_diff
-                    self.daily_volume += latest_usage  # ml/min to ml/day
-                    print(self.last_update,
-                          "- latest_usage (ml):", round(latest_usage, 2),
-                          "daily_volume (ml):", round(self.daily_volume, 2))
+                    await self.calculate_volume(flow_rate, time_diff)
+                    print(self.last_update, "daily_volume (ml):", round(self.daily_volume, 2))
                     await asyncio.sleep(0.5)
+
+    async def calculate_volume(self, flow_rate, time_diff):
+        latest_usage = flow_rate * time_diff
+        self.daily_volume += latest_usage  # ml/min to ml/day
+        return
+
+    async def time_since_last_update(self):
+        try:
+            time_diff = (datetime.now() - self.last_update).total_seconds() / 60  # Calculate time in minutes
+        except TypeError:
+            self.last_update = datetime.strptime(self.last_update, '%Y-%m-%d %H:%M:%S.%f')
+            time_diff = (datetime.now() - self.last_update).total_seconds() / 60  # in minutes
+        return time_diff
