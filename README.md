@@ -9,6 +9,10 @@ The water consumption information is not currently available in the web API.
 
 It will also have device status information (battery levels, signal strength etc), further it will have the ability to open and close the valve.
 
+The device publishes a telemetry message approximately every 1 minute when there is no flow, and approx every second when there is water flowing.
+
+This message contains the flow rate, water temperature, ambient_temp, the absolute water pressure, the battery level, the leak_status, device status and the probe time.
+
 I have initially structured the library with the following classes.
  
 1. `SonicDevice`: This class represents the Sonic device and contains methods to interact with it.
