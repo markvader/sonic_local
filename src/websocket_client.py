@@ -19,7 +19,7 @@ class WebSocketClient:
                                               header=headers,
                                               sslopt={"cert_reqs": ssl.CERT_NONE,
                                                       "check_hostname": False})
-        print("Connected established")
+        print("Connection established")
 
     async def disconnect(self):
         self.ws.close()
