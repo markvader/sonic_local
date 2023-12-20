@@ -4,8 +4,8 @@ import base64
 
 
 class WebSocketClient:
-    def __init__(self, host, port, username, password):
-        self.url = f'wss://{host}:{port}'
+    def __init__(self, host, username, password):
+        self.url = f'wss://{host}:443'
         self.username = username
         self.password = password
         self.ws = None

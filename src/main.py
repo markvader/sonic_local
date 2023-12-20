@@ -5,13 +5,12 @@ import configparser
 config = configparser.ConfigParser()
 config.read('config.ini')
 device_address = config['HOST']['ip_address']
-device_port = config['HOST']['port']
 username = config['CREDENTIALS']['signal_username']
 password = config['CREDENTIALS']['signal_password']
 
 
 async def main():
-    device = SonicDevice(device_address, device_port, username, password)
+    device = SonicDevice(device_address, username, password)
     await device.connect()
 
     telemetry_data_task = asyncio.create_task(device.telemetry_data())
