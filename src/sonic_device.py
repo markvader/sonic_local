@@ -2,17 +2,16 @@ import asyncio
 
 from websocket_client import WebSocketClient
 from message import Message
-from datetime import datetime, timedelta
+from datetime import datetime
 import json
-from json import JSONDecodeError
 
 
 class SonicDevice:
-    def __init__(self, host, port, username, password):
+    def __init__(self, host, username, password):
+        self.client = WebSocketClient(host, username, password)
+        self.daily_volume = 0
         self.last_reset_datetime = None
         self.last_update = '2023-12-14 00:00:00.000001'
-        self.daily_volume = 0
-        self.client = WebSocketClient(host, port, username, password)
 
         # Load the daily usage flag from the file
         is_daily_usage_reset = self.load_flag()
@@ -62,7 +61,7 @@ class SonicDevice:
                 is_daily_usage_reset = json.load(f)
         except FileNotFoundError:
             is_daily_usage_reset = False
-        except JSONDecodeError:
+        except json.JSONDecodeError:
             is_daily_usage_reset = False
         return is_daily_usage_reset
 
@@ -81,7 +80,7 @@ class SonicDevice:
     async def reset_daily_usage(self):
         while True:
             sleep_duration = self.seconds_until_midnight()
-            print(sleep_duration, "seconds until daily statistics reset")
+            print(round(sleep_duration/60, 0), "minutes until daily statistics reset")
             await asyncio.sleep(sleep_duration)
 
             print("Performing daily statistics reset...")
@@ -108,8 +107,12 @@ class SonicDevice:
                 probed_at = message['data']['probed_at']  # 1703073823925
                 if time_diff < 1440:  # If the last update was less than 24 hours ago
                     await self.calculate_volume(flow_rate, time_diff)
-                    print(self.last_update, "daily_volume (ml):", round(self.daily_volume, 2))
-                    await asyncio.sleep(0.5)
+                await asyncio.sleep(0.5)
+                print(self.last_update,
+                      "- flow_rate:", flow_rate,
+                      "- water_temp:", water_temp,
+                      "- abs_pressure:", abs_pressure,
+                      "- daily_volume (ml):", round(self.daily_volume, 2))
 
     async def calculate_volume(self, flow_rate, time_diff):
         latest_usage = flow_rate * time_diff
