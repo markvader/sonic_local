@@ -33,13 +33,12 @@ TO USE
 TODO
 
 1. add method for storing/caching daily volume in case program crashes
-
-2. need to handle the concurrency of receiving/returning volumes, and also state, and performing functions like opening, closing valve
-
-3. Can I automatically identify the devices ip on my local network? or is this something that will be better suited to the Home Assistant integration?
-
-4. remove port number from config.ini and set default as 443 in code.
-5. Handle crashes and reconnection to websocket better, device can become unreachable if clean disconnect is not performed.
-6. Add logging
-7. Add tests
-8. 
+2. ~~handle the concurrency of receiving/returning volumes and also daily tasks~~ using asyncio.gather task to run concurrently 
+3. Handle functions like opening, closing valve alongside the telemetry data stream
+4. Can I automatically identify the devices ip on my local network? or is this something that will be better suited to the Home Assistant integration?
+5. ~~remove port number from config.ini and set default as 443 in code.~~ Done
+6. ~~Handle crashes and reconnection to websocket better, device can become unreachable if clean disconnect is not performed.~~ Working quite well now
+7. Add logging
+8. Add tests
+9. average pressure 
+10. ...
