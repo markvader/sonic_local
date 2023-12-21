@@ -8,6 +8,7 @@ import json
 
 class SonicDevice:
     def __init__(self, host, username, password):
+        self.telemetry_json_data = dict()
         self.client = WebSocketClient(host, username, password)
         self.daily_volume = 0
         self.last_reset_datetime = None
@@ -18,11 +19,11 @@ class SonicDevice:
         self.is_daily_usage_reset = is_daily_usage_reset
 
     async def connect(self):
-        print("Device connecting")
+        print("Connecting to device")
         await self.client.connect()
 
     async def disconnect(self):
-        print("Device disconnecting")
+        print("Disconnecting from device")
         await self.client.disconnect()
 
     async def subscribe(self, event):
@@ -51,9 +52,10 @@ class SonicDevice:
         message = Message('changeState', {'valve_state': state})
         await self.client.send(message.to_json())
 
-    def save_flag(self):
-        with open('is_daily_usage_reset.txt', 'w') as f:
-            f.write(str(self.is_daily_usage_reset))
+    def save_telemetry_data(self):
+        with open("telemetry_data.json", "a") as f:
+            json.dump(self.telemetry_json_data, f)
+            f.write("\n")
 
     def load_flag(self):
         try:
@@ -93,7 +95,7 @@ class SonicDevice:
         while True:
             response = await self.client.receive()
             message = json.loads(response)
-
+            # print('message', message)
             if message['event'] == 'telemetry':
                 probed_at = message['data']['probed_at']  # 1703073823925
                 telemetry_datetime = datetime.fromtimestamp(probed_at / 1000.0)  # 2023-12-20 17:16:24.430000
@@ -102,18 +104,32 @@ class SonicDevice:
                 flow_rate = message['data']['water_flow']  # 3088.8671875
                 leak_status = message['data']['leak_status']  # No Leaks
                 status = message['data']['status']  # ['OKAY']
+                status_string = ', '.join(status)
                 water_temp = message['data']['water_temp']  # 10.4375
                 ambient_temp = message['data']['ambient_temp']  # 11.9375
                 abs_pressure = message['data']['abs_pressure']  # 4831
                 battery_level = message['data']['battery_level']  # okay
                 if time_diff < 1440:  # If the last update was less than 24 hours ago
                     await self.calculate_volume(flow_rate, time_diff)
+                daily_volume_ml = round(float(self.daily_volume), 2)
                 await asyncio.sleep(0.5)
-                print("data_timestamp:", telemetry_datetime,
-                      "- flow_rate:", flow_rate,
-                      "- water_temp:", water_temp,
-                      "- abs_pressure:", abs_pressure,
-                      "- daily_volume (ml):", round(self.daily_volume, 2))
+                # print("data_timestamp:", telemetry_datetime,
+                #       "- flow_rate:", flow_rate,
+                #       "- water_temp:", water_temp,
+                #       "- abs_pressure:", abs_pressure,
+                #       "- daily_volume (ml):", round(self.daily_volume, 2))
+                self.telemetry_json_data = {
+                    'probed_at': probed_at,
+                    'water_temp': water_temp,
+                    'abs_pressure': abs_pressure,
+                    'flow_rate': flow_rate,
+                    'leak_status': leak_status,
+                    'battery_level': battery_level,
+                    'ambient_temp': ambient_temp,
+                    'daily_volume_ml': daily_volume_ml,
+                    'status': status_string
+                }
+                self.save_telemetry_data()
 
     async def calculate_volume(self, flow_rate, time_diff):
         latest_usage = flow_rate * time_diff

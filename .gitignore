@@ -3,6 +3,7 @@
 # Ignored files
 config.ini
 is_daily_usage_reset.txt
+telemetry_data.json
 
 # Ignored folders
 .idea/
