@@ -7,7 +7,7 @@ It will have less control of device and account settings (than the web api libra
 
 The water consumption information is not currently available in the web API.
 
-It will also have device status information (battery levels, signal strength etc), further it will have the ability to open and close the valve.
+It will also have device status information (battery levels, signal strength etc.), further it will have the ability to open and close the valve.
 
 The device publishes a telemetry message approximately every 1 minute when there is no flow, and approx every second when there is water flowing.
 
