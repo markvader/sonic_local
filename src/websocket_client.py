@@ -122,8 +122,7 @@ class WebSocketClient:
                         battery_level = message['data']['battery_level']  # okay
                         if time_diff < 1440:  # If the last update was less than 24 hours ago
                             await self.calculate_volume(flow_rate, time_diff)
-                        with open(self.daily_volume_data_file, "w") as f:
-                            f.write(str(self.daily_volume))
+                        await self.save_volume_to_file()
                         daily_volume_ml = round(float(self.daily_volume), 2)
                         await asyncio.sleep(0.5)
                         print("data_timestamp:", telemetry_datetime,
@@ -155,6 +154,10 @@ class WebSocketClient:
                 # Websocket closing
                 self.ws = None
                 _LOGGER.debug("Websocket connection reset, will try again")
+
+    async def save_volume_to_file(self):
+        with open(self.daily_volume_data_file, "w") as f:
+            f.write(str(self.daily_volume))
 
     def save_telemetry_data(self):
         with open("telemetry_data.json", "a") as f:
