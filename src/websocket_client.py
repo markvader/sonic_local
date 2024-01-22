@@ -22,9 +22,13 @@ else:
 
 _LOGGER = logging.getLogger(__name__)
 
+data_folder = "data_folder"
+os.makedirs(data_folder, exist_ok=True)
+
 
 class WebSocketClient:
     """Sonic websocket handler."""
+
     def __init__(self,
                  host: str,
                  username: str,
@@ -42,7 +46,8 @@ class WebSocketClient:
         self.last_reset_datetime = None
         self.last_update = '2023-12-14 00:00:00.000001'
         self.telemetry_json_data = dict()
-        self.daily_volume_data_file = "daily_volume.txt"
+        self.telemetry_data_file = os.path.join(data_folder, "telemetry_data.json")
+        self.daily_volume_data_file = os.path.join(data_folder, "daily_volume.txt")
 
     def to_base64(self):
         return base64.b64encode(f'{self.username}:{self.password}'.encode()).decode()
@@ -94,13 +99,9 @@ class WebSocketClient:
                 await self.connect()
                 assert self.ws
             try:
-                if self.daily_volume == 0 and os.path.exists(self.daily_volume_data_file):
-                    with open(self.daily_volume_data_file, "r") as f:
-                        self.daily_volume = float(f.read())
-                    print(f"Loaded last volume usage from file: {self.daily_volume}")
-
+                await self.load_previous_volume_data()
                 raw_msg = await self.ws.receive()
-                ic(raw_msg)
+                # ic(raw_msg)
                 if raw_msg.type in (WSMsgType.CLOSE, WSMsgType.CLOSED, WSMsgType.CLOSING):
                     _LOGGER.debug("Websocket closed, will try again")
                 elif raw_msg.type != WSMsgType.TEXT:
@@ -108,40 +109,15 @@ class WebSocketClient:
                 else:
                     message = raw_msg.json()
                     if message['event'] == 'telemetry':
-                        probed_at = message['data']['probed_at']  # 1703073823925
-                        telemetry_datetime = datetime.fromtimestamp(probed_at / 1000.0)  # 2023-12-20 17:16:24.430000
-                        time_diff = await self.time_since_last_update(telemetry_datetime)
-                        self.last_update = telemetry_datetime
-                        flow_rate = message['data']['water_flow']  # 3088.8671875
-                        leak_status = message['data']['leak_status']  # No Leaks
-                        status = message['data']['status']  # ['OKAY']
-                        status_string = ', '.join(status)
-                        water_temp = message['data']['water_temp']  # 10.4375
-                        ambient_temp = message['data']['ambient_temp']  # 11.9375
-                        abs_pressure = message['data']['abs_pressure']  # 4831
-                        battery_level = message['data']['battery_level']  # okay
+                        abs_pressure, ambient_temp, battery_level, flow_rate, leak_status, probed_at, status_str, \
+                            telemetry_datetime, time_diff, water_temp = await self.extract_telemetry_data(message)
                         if time_diff < 1440:  # If the last update was less than 24 hours ago
                             await self.calculate_volume(flow_rate, time_diff)
                         await self.save_volume_to_file()
                         daily_volume_ml = round(float(self.daily_volume), 2)
+                        self.save_telemetry_data(probed_at, water_temp, abs_pressure, flow_rate, leak_status,
+                                                 battery_level, ambient_temp, daily_volume_ml, status_str)
                         await asyncio.sleep(0.5)
-                        print("data_timestamp:", telemetry_datetime,
-                              "- flow_rate:", flow_rate,
-                              "- water_temp:", water_temp,
-                              "- abs_pressure:", abs_pressure,
-                              "- daily_volume (ml):", round(self.daily_volume, 2))
-                        self.telemetry_json_data = {
-                            'probed_at': probed_at,
-                            'water_temp': water_temp,
-                            'abs_pressure': abs_pressure,
-                            'flow_rate': flow_rate,
-                            'leak_status': leak_status,
-                            'battery_level': battery_level,
-                            'ambient_temp': ambient_temp,
-                            'daily_volume_ml': daily_volume_ml,
-                            'status': status_string
-                        }
-                        self.save_telemetry_data()
                     if message['event'] == 'state':
                         valve_state = message['data']['valve_state']
                         radio_state = message['data']['radio_state']
@@ -155,12 +131,47 @@ class WebSocketClient:
                 self.ws = None
                 _LOGGER.debug("Websocket connection reset, will try again")
 
+    async def extract_telemetry_data(self, message):
+        probed_at = message['data']['probed_at']  # 1703073823925
+        telemetry_datetime = datetime.fromtimestamp(probed_at / 1000.0)  # 2023-12-20 17:16:24.430000
+        time_diff = await self.time_since_last_update(telemetry_datetime)
+        self.last_update = telemetry_datetime
+        flow_rate = message['data']['water_flow']  # 3088.8671875
+        leak_status = message['data']['leak_status']  # No Leaks
+        status = message['data']['status']  # ['OKAY']
+        status_str = ', '.join(status)
+        water_temp = message['data']['water_temp']  # 10.4375
+        ambient_temp = message['data']['ambient_temp']  # 11.9375
+        abs_pressure = message['data']['abs_pressure']  # 4831
+        battery_level = message['data']['battery_level']  # okay
+        return abs_pressure, ambient_temp, battery_level, flow_rate, leak_status, \
+               probed_at, status_str, telemetry_datetime, time_diff, water_temp
+
+    async def load_previous_volume_data(self):
+        if self.daily_volume == 0 and os.path.exists(self.daily_volume_data_file):
+            with open(self.daily_volume_data_file, "r") as f:
+                self.daily_volume = float(f.read())
+            print(f"Loaded last volume usage from file: {self.daily_volume}")
+
     async def save_volume_to_file(self):
         with open(self.daily_volume_data_file, "w") as f:
             f.write(str(self.daily_volume))
 
-    def save_telemetry_data(self):
-        with open("telemetry_data.json", "a") as f:
+    def save_telemetry_data(self, probed_at, water_temp, abs_pressure, flow_rate, leak_status,
+                            battery_level, ambient_temp, daily_volume_ml, status_str):
+        self.telemetry_json_data = {
+            'probed_at': probed_at,
+            'water_temp': water_temp,
+            'abs_pressure': abs_pressure,
+            'flow_rate': flow_rate,
+            'leak_status': leak_status,
+            'battery_level': battery_level,
+            'ambient_temp': ambient_temp,
+            'daily_volume_ml': daily_volume_ml,
+            'status': status_str
+        }
+        print(self.telemetry_json_data)
+        with open(self.telemetry_data_file, "a") as f:
             json.dump(self.telemetry_json_data, f)
             f.write("\n")
 
@@ -179,7 +190,7 @@ class WebSocketClient:
     async def reset_daily_usage(self):
         while True:
             sleep_duration = self.seconds_until_midnight()
-            print(round(sleep_duration/60, 0), "minutes until daily statistics reset")
+            print(round(sleep_duration / 3600, 1), "hours until daily statistics are reset")
             await asyncio.sleep(sleep_duration)
 
             print("Performing daily statistics reset...")

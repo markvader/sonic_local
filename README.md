@@ -36,7 +36,7 @@ TO USE
 
 TODO
 
-1. add method for storing/caching daily volume in case program crashes
+1. ~~add method for storing/caching daily volume in case program crashes~~
 2. ~~handle the concurrency of receiving/returning volumes and also daily tasks~~ using asyncio.gather task to run concurrently 
 3. Handle functions like opening, closing valve alongside the telemetry data stream
 4. Can I automatically identify the devices ip on my local network? or is this something that will be better suited to the Home Assistant integration?
