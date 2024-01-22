@@ -1,4 +1,5 @@
 import json
+import os
 import sys
 import base64
 import asyncio
@@ -41,6 +42,7 @@ class WebSocketClient:
         self.last_reset_datetime = None
         self.last_update = '2023-12-14 00:00:00.000001'
         self.telemetry_json_data = dict()
+        self.daily_volume_data_file = "daily_volume.txt"
 
     def to_base64(self):
         return base64.b64encode(f'{self.username}:{self.password}'.encode()).decode()
@@ -92,6 +94,11 @@ class WebSocketClient:
                 await self.connect()
                 assert self.ws
             try:
+                if self.daily_volume == 0 and os.path.exists(self.daily_volume_data_file):
+                    with open(self.daily_volume_data_file, "r") as f:
+                        self.daily_volume = float(f.read())
+                    print(f"Loaded last volume usage from file: {self.daily_volume}")
+
                 raw_msg = await self.ws.receive()
                 ic(raw_msg)
                 if raw_msg.type in (WSMsgType.CLOSE, WSMsgType.CLOSED, WSMsgType.CLOSING):
@@ -115,6 +122,8 @@ class WebSocketClient:
                         battery_level = message['data']['battery_level']  # okay
                         if time_diff < 1440:  # If the last update was less than 24 hours ago
                             await self.calculate_volume(flow_rate, time_diff)
+                        with open(self.daily_volume_data_file, "w") as f:
+                            f.write(str(self.daily_volume))
                         daily_volume_ml = round(float(self.daily_volume), 2)
                         await asyncio.sleep(0.5)
                         print("data_timestamp:", telemetry_datetime,
