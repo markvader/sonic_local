@@ -10,3 +10,5 @@ daily_volume.txt
 .idea/
 venv/
 src/__pycache__
+src/data_folder/
+```

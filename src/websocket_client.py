@@ -145,7 +145,7 @@ class WebSocketClient:
         abs_pressure = message['data']['abs_pressure']  # 4831
         battery_level = message['data']['battery_level']  # okay
         return abs_pressure, ambient_temp, battery_level, flow_rate, leak_status, \
-               probed_at, status_str, telemetry_datetime, time_diff, water_temp
+            probed_at, status_str, telemetry_datetime, time_diff, water_temp
 
     async def load_previous_volume_data(self):
         if self.daily_volume == 0 and os.path.exists(self.daily_volume_data_file):

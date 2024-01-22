@@ -42,7 +42,9 @@ TODO
 4. Can I automatically identify the devices ip on my local network? or is this something that will be better suited to the Home Assistant integration?
 5. ~~remove port number from config.ini and set default as 443 in code.~~ Done
 6. ~~Handle crashes and reconnection to websocket better, device can become unreachable if clean disconnect is not performed.~~ Working quite well now
-7. Add logging
+7. ~~Add~~ improve logging (print statements to logger)
 8. Add tests
-9. average pressure 
-10. ...
+9. average pressure? or max pressure? 
+10. handle different timezones
+11. remove old code in sonic_device.py
+12. ...
