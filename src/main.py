@@ -1,7 +1,8 @@
 import argparse
-from websocket_client import WebSocketClient
 import asyncio
 import logging
+
+from .websocket_client import WebSocketClient
 
 logging.basicConfig(level=logging.DEBUG)
 
