@@ -2,12 +2,12 @@
 
 
 class SonicWebsocketError(Exception):
-    """Base exception for Sonos websockets."""
+    """Base exception for Sonic websockets."""
 
 
 class SonicWSConnectionError(SonicWebsocketError):
-    """Connection error encountered on a Sonos websocket."""
+    """Connection error encountered on a Sonic websocket."""
 
 
 class Unauthorized(SonicWebsocketError):
-    """Authorization rejected when connecting to a Sonos websocket."""
+    """Authorization rejected when connecting to a Sonic websocket."""
