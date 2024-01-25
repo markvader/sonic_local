@@ -8,6 +8,6 @@ daily_volume.txt
 # Ignored folders
 .idea/
 venv/
-src/__pycache__
-src/data_folder/
+sonic_local/__pycache__
+sonic_local/data_folder/
 ```
