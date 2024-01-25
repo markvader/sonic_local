@@ -6,8 +6,8 @@ import asyncio
 import aiohttp
 from aiohttp import WSMsgType
 from datetime import datetime
-from icecream import ic
 import logging
+from typing import Any
 
 from exception import (
     SonicWebsocketError,
@@ -25,6 +25,8 @@ _LOGGER = logging.getLogger(__name__)
 data_folder = "data_folder"
 os.makedirs(data_folder, exist_ok=True)
 
+MAX_ATTEMPTS = 2
+
 
 class WebSocketClient:
     """Sonic websocket handler."""
@@ -33,7 +35,8 @@ class WebSocketClient:
                  host: str,
                  username: str,
                  password: str,
-                 session: aiohttp.ClientSession | None = None
+                 session: aiohttp.ClientSession | None = None,
+                 timeout: int = 15,
                  ) -> None:
         self.uri = f'wss://{host}:443'
         self.username = username
@@ -48,6 +51,7 @@ class WebSocketClient:
         self.telemetry_json_data = dict()
         self.telemetry_data_file = os.path.join(data_folder, "telemetry_data.json")
         self.daily_volume_data_file = os.path.join(data_folder, "daily_volume.txt")
+        self._timeout = timeout
 
     def to_base64(self):
         return base64.b64encode(f'{self.username}:{self.password}'.encode()).decode()
@@ -62,7 +66,7 @@ class WebSocketClient:
         _LOGGER.debug("Opening websocket to %s", self.uri)
         headers = {'Authorization': 'Basic ' + self.to_base64()}
         try:
-            async with asyncio_timeout(15):
+            async with asyncio_timeout(self._timeout):
                 self.ws = await self.session.ws_connect(
                     self.uri, headers=headers, verify_ssl=False
                 )
@@ -101,7 +105,6 @@ class WebSocketClient:
             try:
                 await self.load_previous_volume_data()
                 raw_msg = await self.ws.receive()
-                # ic(raw_msg)
                 if raw_msg.type in (WSMsgType.CLOSE, WSMsgType.CLOSED, WSMsgType.CLOSING):
                     _LOGGER.debug("Websocket closed, will try again")
                 elif raw_msg.type != WSMsgType.TEXT:
@@ -130,6 +133,66 @@ class WebSocketClient:
                 # Websocket closing
                 self.ws = None
                 _LOGGER.debug("Websocket connection reset, will try again")
+
+    async def send_command(self, payload: dict[str, Any] | None = None) -> list[dict[str, Any]]:
+        """Send commands over the websocket and handle their responses."""
+        attempt = 1
+        while attempt <= MAX_ATTEMPTS:
+            if not self.ws or self.ws.closed:
+                await self.connect()
+                assert self.ws
+            _LOGGER.debug("Sending command: %s", payload)
+            try:
+                async with asyncio_timeout(self._timeout):
+                    await self.ws.send_json(payload)
+                    raw_msg = await self.ws.receive()
+                    if raw_msg.type in (WSMsgType.CLOSE, WSMsgType.CLOSED, WSMsgType.CLOSING):
+                        _LOGGER.debug("Websocket closed, will try again")
+                    elif raw_msg.type != WSMsgType.TEXT:
+                        _LOGGER.error("Received non-text message: %s", raw_msg.type.name)
+                    else:
+                        message = raw_msg.json()
+                        if message['event'] == 'telemetry':
+                            abs_pressure, ambient_temp, battery_level, flow_rate, leak_status, probed_at, status_str, \
+                                telemetry_datetime, time_diff, water_temp = await self.extract_telemetry_data(message)
+                            if time_diff < 1440:  # If the last update was less than 24 hours ago
+                                await self.calculate_volume(flow_rate, time_diff)
+                            await self.save_volume_to_file()
+                            daily_volume_ml = round(float(self.daily_volume), 2)
+                            self.save_telemetry_data(probed_at, water_temp, abs_pressure, flow_rate, leak_status,
+                                                     battery_level, ambient_temp, daily_volume_ml, status_str)
+                            await asyncio.sleep(0.5)
+                        if message['event'] == 'state':
+                            valve_state = message['data']['valve_state']
+                            radio_state = message['data']['radio_state']
+                            print("data_timestamp:", datetime.now(),
+                                  "- valve_state:", valve_state,
+                                  "- radio_state:", radio_state)
+            except asyncio.TimeoutError:
+                _LOGGER.error("Command timed out")
+            except ConnectionResetError:
+                # Websocket closing
+                self.ws = None
+                _LOGGER.debug("Websocket connection reset, will try again")
+            attempt += 1
+
+    async def request_command(
+            self, command: str | None = None
+    ) -> list[dict[str, Any]]:
+        """Request Data (either requestState or requestTelemetry."""
+        command_json: dict[str, Any] = {
+            "event": command
+        }
+        return await self.send_command(command_json)
+
+    async def change_command(
+            self, command: str | None = None
+    ) -> list[dict[str, Any]]:
+        """Request Change State of Valve (either open or closed)."""
+        command_json: dict[str, Any] = {
+            "event": "changeState", "data": {"valve_state": command}
+        }
+        return await self.send_command(command_json)
 
     async def extract_telemetry_data(self, message):
         probed_at = message['data']['probed_at']  # 1703073823925
