@@ -1,3 +1,4 @@
+"""Handler for Sonic websockets."""
 import json
 import os
 import sys
@@ -8,8 +9,8 @@ from aiohttp import WSMsgType
 from datetime import datetime
 import logging
 from typing import Any
-
-from exception import (
+from .const import MAX_ATTEMPTS
+from .exception import (
     SonicWebsocketError,
     SonicWSConnectionError,
     Unauthorized
@@ -24,8 +25,6 @@ _LOGGER = logging.getLogger(__name__)
 
 data_folder = "data_folder"
 os.makedirs(data_folder, exist_ok=True)
-
-MAX_ATTEMPTS = 2
 
 
 class WebSocketClient:
@@ -134,17 +133,17 @@ class WebSocketClient:
                 self.ws = None
                 _LOGGER.debug("Websocket connection reset, will try again")
 
-    async def send_command(self, payload: dict[str, Any] | None = None) -> list[dict[str, Any]]:
+    async def send_command(self, command: dict[str, Any] | None = None) -> list[dict[str, Any]]:
         """Send commands over the websocket and handle their responses."""
         attempt = 1
         while attempt <= MAX_ATTEMPTS:
             if not self.ws or self.ws.closed:
                 await self.connect()
                 assert self.ws
-            _LOGGER.debug("Sending command: %s", payload)
+            _LOGGER.debug("Sending command: %s", command)
             try:
                 async with asyncio_timeout(self._timeout):
-                    await self.ws.send_json(payload)
+                    await self.ws.send_json(command)
                     raw_msg = await self.ws.receive()
                     if raw_msg.type in (WSMsgType.CLOSE, WSMsgType.CLOSED, WSMsgType.CLOSING):
                         _LOGGER.debug("Websocket closed, will try again")
@@ -175,6 +174,10 @@ class WebSocketClient:
                 self.ws = None
                 _LOGGER.debug("Websocket connection reset, will try again")
             attempt += 1
+        command_name = command.get("command", "Empty")
+        raise SonicWebsocketError(
+            f"{command_name} command failed after {MAX_ATTEMPTS} attempts"
+        )
 
     async def request_command(
             self, command: str | None = None
