@@ -1,7 +1,6 @@
 # Gitignore settings for Sonic Device - Local API Python Library
 
 # Ignored files
-config.ini
 is_daily_usage_reset.txt
 telemetry_data.json
 daily_volume.txt
