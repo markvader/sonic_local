@@ -32,8 +32,8 @@ TO USE
 1. ~~To test. copy the config_demo.ini file and rename to config.ini and update the values with your device details.~~
 2. You need to enable the `Local mode status` in the `Signal Settings` within the `Settings` in the `Sonic` App to get the device's local server username/password.
 3. If the `Local mode status` is disabled and re-enabled, the username/password will change.
-4. Then from the terminal run `python main.py --ip YOURIPADDRESS -u YOURUSERNAME -p YOURPASSWORD --c XXXXXX` where XXXXXX is either `open`, `closed`, `requestState` or `requestTelemetry`.
-5. for help with the command line arguments run `python main.py --help`
+4. Then from the terminal run `python -m sonic_local --ip YOURIPADDRESS -u YOURUSERNAME -p YOURPASSWORD --c XXXXXX` where XXXXXX is either `open`, `closed`, `requestState` or `requestTelemetry`.
+5. for help with the command line arguments run `python -m sonic_local --help`
 
 TODO
 
