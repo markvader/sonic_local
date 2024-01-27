@@ -9,6 +9,7 @@ from aiohttp import WSMsgType
 from datetime import datetime
 import logging
 from typing import Any
+from icecream import ic
 from .const import MAX_ATTEMPTS
 from .exception import (
     SonicWebsocketError,
@@ -133,40 +134,41 @@ class WebSocketClient:
                 self.ws = None
                 _LOGGER.debug("Websocket connection reset, will try again")
 
-    async def send_command(self, command: dict[str, Any] | None = None) -> list[dict[str, Any]]:
+    async def send_command(self, command_json: dict[str, Any], command: str) -> list[dict[str, Any]]:
         """Send commands over the websocket and handle their responses."""
         attempt = 1
+        if command == 'requestState':
+            event_name = 'state'
+        elif command == 'requestTelemetry':
+            event_name = 'telemetry'
+        elif command == 'open' or command == 'closed':
+            event_name = 'changeState'
         while attempt <= MAX_ATTEMPTS:
             if not self.ws or self.ws.closed:
                 await self.connect()
                 assert self.ws
-            _LOGGER.debug("Sending command: %s", command)
+            _LOGGER.debug("Sending command: %s", command_json)
             try:
                 async with asyncio_timeout(self._timeout):
-                    await self.ws.send_json(command)
-                    raw_msg = await self.ws.receive()
-                    if raw_msg.type in (WSMsgType.CLOSE, WSMsgType.CLOSED, WSMsgType.CLOSING):
-                        _LOGGER.debug("Websocket closed, will try again")
-                    elif raw_msg.type != WSMsgType.TEXT:
-                        _LOGGER.error("Received non-text message: %s", raw_msg.type.name)
-                    else:
-                        message = raw_msg.json()
-                        if message['event'] == 'telemetry':
-                            abs_pressure, ambient_temp, battery_level, flow_rate, leak_status, probed_at, status_str, \
-                                telemetry_datetime, time_diff, water_temp = await self.extract_telemetry_data(message)
-                            if time_diff < 1440:  # If the last update was less than 24 hours ago
-                                await self.calculate_volume(flow_rate, time_diff)
-                            await self.save_volume_to_file()
-                            daily_volume_ml = round(float(self.daily_volume), 2)
-                            self.save_telemetry_data(probed_at, water_temp, abs_pressure, flow_rate, leak_status,
-                                                     battery_level, ambient_temp, daily_volume_ml, status_str)
-                            await asyncio.sleep(0.5)
-                        if message['event'] == 'state':
-                            valve_state = message['data']['valve_state']
-                            radio_state = message['data']['radio_state']
-                            print("data_timestamp:", datetime.now(),
-                                  "- valve_state:", valve_state,
-                                  "- radio_state:", radio_state)
+                    await self.ws.send_json(command_json)
+                    # Need to await for the right message
+                    while True:
+                        raw_msg = await self.ws.receive()
+                        ic(159, raw_msg)
+                        if raw_msg.type in (WSMsgType.CLOSE, WSMsgType.CLOSED, WSMsgType.CLOSING):
+                            _LOGGER.debug("Websocket closed, will try again")
+                        elif raw_msg.type != WSMsgType.TEXT:
+                            _LOGGER.error("Received non-text message: %s", raw_msg.type.name)
+                        else:
+                            try:
+                                message = raw_msg.json()
+                                ic(167, message)
+                                if message['event'] == event_name:
+                                    return message  # Return the matching message
+                            except json.JSONDecodeError:
+                                # Handle invalid JSON data
+                                ic("Received invalid JSON data:", raw_msg)
+                                continue  # Move on to the next message
             except asyncio.TimeoutError:
                 _LOGGER.error("Command timed out")
             except ConnectionResetError:
@@ -174,10 +176,26 @@ class WebSocketClient:
                 self.ws = None
                 _LOGGER.debug("Websocket connection reset, will try again")
             attempt += 1
-        command_name = command.get("command", "Empty")
         raise SonicWebsocketError(
-            f"{command_name} command failed after {MAX_ATTEMPTS} attempts"
+            f"{command} command failed after {MAX_ATTEMPTS} attempts"
         )
+        # if message['event'] == 'telemetry':
+        #     abs_pressure, ambient_temp, battery_level, flow_rate, leak_status, probed_at, status_str, \
+        #         telemetry_datetime, time_diff, water_temp = await self.extract_telemetry_data(message)
+        #     if time_diff < 1440:  # If the last update was less than 24 hours ago
+        #         await self.calculate_volume(flow_rate, time_diff)
+        #     await self.save_volume_to_file()
+        #     daily_volume_ml = round(float(self.daily_volume), 2)
+        #     self.save_telemetry_data(probed_at, water_temp, abs_pressure, flow_rate, leak_status,
+        #                              battery_level, ambient_temp, daily_volume_ml, status_str)
+        #     return message.json()
+        # if message['event'] == 'state':
+        #     valve_state = message['data']['valve_state']
+        #     radio_state = message['data']['radio_state']
+        #     print("data_timestamp:", datetime.now(),
+        #           "- valve_state:", valve_state,
+        #           "- radio_state:", radio_state)
+        #     return message.json()
 
     async def request_command(
             self, command: str | None = None
@@ -186,7 +204,7 @@ class WebSocketClient:
         command_json: dict[str, Any] = {
             "event": command
         }
-        return await self.send_command(command_json)
+        return await self.send_command(command_json, command)
 
     async def change_command(
             self, command: str | None = None
@@ -195,7 +213,7 @@ class WebSocketClient:
         command_json: dict[str, Any] = {
             "event": "changeState", "data": {"valve_state": command}
         }
-        return await self.send_command(command_json)
+        return await self.send_command(command_json, command)
 
     async def extract_telemetry_data(self, message):
         probed_at = message['data']['probed_at']  # 1703073823925
