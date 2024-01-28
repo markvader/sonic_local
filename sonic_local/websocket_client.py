@@ -52,6 +52,9 @@ class WebSocketClient:
         self.telemetry_data_file = os.path.join(data_folder, "telemetry_data.json")
         self.daily_volume_data_file = os.path.join(data_folder, "daily_volume.txt")
         self._timeout = timeout
+        # Mapping event outbound message to inbound message
+        self.event_names = {'requestState': 'state', 'requestTelemetry': 'telemetry',
+                            'open': 'changeState', 'closed': 'changeState'}
 
     def to_base64(self):
         return base64.b64encode(f'{self.username}:{self.password}'.encode()).decode()
@@ -137,12 +140,6 @@ class WebSocketClient:
     async def send_command(self, command_json: dict[str, Any], command: str) -> list[dict[str, Any]]:
         """Send commands over the websocket and handle their responses."""
         attempt = 1
-        if command == 'requestState':
-            event_name = 'state'
-        elif command == 'requestTelemetry':
-            event_name = 'telemetry'
-        elif command == 'open' or command == 'closed':
-            event_name = 'changeState'
         while attempt <= MAX_ATTEMPTS:
             if not self.ws or self.ws.closed:
                 await self.connect()
@@ -163,7 +160,7 @@ class WebSocketClient:
                             try:
                                 message = raw_msg.json()
                                 ic(167, message)
-                                if message['event'] == event_name:
+                                if message['event'] == self.event_names[command]:
                                     return message  # Return the matching message
                             except json.JSONDecodeError:
                                 # Handle invalid JSON data
